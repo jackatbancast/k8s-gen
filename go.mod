@@ -1,4 +1,4 @@
-module github.com/jsonnet-libs/k8s
+module github.com/jackatbancast/k8s-gen
 
 go 1.18
 

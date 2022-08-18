@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/jsonnet-libs/k8s/pkg/swagger"
+	"github.com/jackatbancast/k8s-gen/pkg/swagger"
 )
 
 var expr = regexp.MustCompile(`(?mU)(?P<domain>.+)\.((?P<group>\w*)\.)?(?P<version>\w*)\.(?P<kind>\w*)$`)
