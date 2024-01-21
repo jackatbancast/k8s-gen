@@ -99,6 +99,7 @@ local d = import 'doc-util/main.libsonnet';
               type: 'string',
               string: {
                 fmt: '%s-' + suffix,
+                type: 'Format',
               },
             }],
           },
@@ -170,6 +171,57 @@ local d = import 'doc-util/main.libsonnet';
         toFieldPath: to,
       },
 
+      local combine(type, toFieldPath, fmtString, fromFieldPaths) = {
+        type: type,
+        combine: {
+          variables: [
+            {
+              fromFieldPath: fromFieldPath,
+            }
+            for fromFieldPath in fromFieldPaths
+          ],
+          strategy: 'string',
+          string: {
+            fmt: fmtString,
+          },
+        },
+        toFieldPath: toFieldPath,
+      },
+
+
+      '#combineFromComposite':: d.fn(help=|||
+        This type patches from a combination of multiple fields within the XR 
+        to a field within the composed resource. 
+        It’s commonly used to expose a composed resource spec field as an XR spec field.
+      |||, args=[
+        d.arg('toFieldPath', d.T.string),
+        d.arg('fmtString', d.T.string),
+        d.arg('fromFieldPaths', d.T.array),
+      ]),
+      combineFromComposite(toFieldPath, fmtString, fromFieldPaths):: combine(
+        'CombineFromComposite',
+        toFieldPath,
+        fmtString,
+        fromFieldPaths,
+      ),
+
+      '#combineToComposite':: d.fn(help=|||
+        The inverse of CombineFromComposite. This type patches from multiple fields 
+        within the composed resource to a a field within the XR.
+        It’s commonly used to derive an XR status field from a combination of resource fields.
+      |||, args=[
+        d.arg('toFieldPath', d.T.string),
+        d.arg('fmtString', d.T.string),
+        d.arg('fromFieldPaths', d.T.array),
+      ]),
+      combineToComposite(toFieldPath, fmtString, fromFieldPaths):: combine(
+        'CombineToComposite',
+        toFieldPath,
+        fmtString,
+        fromFieldPaths,
+      ),
+
+
       policy: {
         '#fromFieldPath':: d.fn(help=|||
           By default Crossplane will skip the patch until all of the variables to be
@@ -205,6 +257,20 @@ local d = import 'doc-util/main.libsonnet';
       },
 
       transforms: {
+        local convertTransform(toType) = {
+          type: 'convert',
+          convert: { toType: toType },
+        },
+
+        '#convert':: d.fn(help=|||
+          Convert a field to a different type.
+        |||, args=[
+          d.arg('toType', d.T.string),
+        ]),
+        convert(toType): {
+          transforms+: [convertTransform(toType)],
+        },
+
         '#bool':: d.fn(help=|||
           Transform strings to booleans.
           Example: `bool(true_value='Orphan', false_value='Delete')`
@@ -214,10 +280,7 @@ local d = import 'doc-util/main.libsonnet';
         ]),
         bool(true_value, false_value): {
           transforms+: [
-            {
-              type: 'convert',
-              convert: { toType: 'string' },
-            },
+            convertTransform('string'),
             {
               type: 'map',
               map: {
@@ -227,6 +290,7 @@ local d = import 'doc-util/main.libsonnet';
             },
           ],
         },
+
         '#map':: d.fn(help=|||
           Use a Map to transform keys into values.
         |||, args=[
@@ -240,6 +304,186 @@ local d = import 'doc-util/main.libsonnet';
             },
           ],
         },
+
+        '#match':: d.fn(help=|||
+          Match a value to a list of patterns.
+          Use the literalPattern or regexpPattern function to create the patterns.
+          Return the fallbackValue or fallback to the input if no pattern matches.
+        |||, args=[
+          d.arg('patterns', d.T.array),
+          d.arg('fallbackValue', d.T.string),
+          d.arg('fallbackTo', d.T.string),
+        ]),
+        match(patterns, fallbackValue=null, fallbackTo='Value'): {
+          assert fallbackTo == 'Input' || (fallbackTo == 'Value' && fallbackValue != null) :
+                 'fallbackTo must be set to either "Input" or "Value" (with a fallbackValue in that case))',
+          local patternsArray = if std.isArray(patterns) then patterns else [patterns],
+
+          transforms+: [
+            convertTransform('string'),
+            {
+              type: 'match',
+              match: {
+                patterns: patterns,
+                fallbackTo: fallbackTo,
+              } + (
+                if fallbackTo == 'Value' then {
+                  fallbackValue: fallbackValue,
+                } else {}
+              ),
+            },
+          ],
+        },
+
+        '#literalPattern':: d.fn(help=|||
+          Match a value against a literal, and return the result if the value matches.
+          To be used with the match transform.
+        |||, args=[
+          d.arg('literal', d.T.string),
+          d.arg('result', d.T.string),
+        ]),
+        literalPattern(literal, result): {
+          type: 'literal',
+          literal: literal,
+          result: result,
+        },
+
+        '#regexpPattern':: d.fn(help=|||
+          Match a value against a regexp, and return the result if the value matches.
+          To be used with the match transform.
+        |||, args=[
+          d.arg('regexp', d.T.string),
+          d.arg('result', d.T.string),
+        ]),
+        regexpPattern(regexp, result): {
+          type: 'regexp',
+          regexp: regexp,
+          result: result,
+        },
+
+        string: {
+          '#fmt':: d.fn(help=|||
+            Format a string. The format string is a Go format string.
+          |||, args=[
+            d.arg('fmt', d.T.string),
+          ]),
+          fmt(fmt): {
+            type: 'string',
+            string: {
+              type: 'Format',
+              fmt: fmt,
+            },
+          },
+
+          local convertTransform(type) = {
+            type: 'string',
+            string: {
+              type: 'Convert',
+              convert: type,
+            },
+          },
+
+          // generate a convertXXX for each of the convert types
+          '#convertToUpper':: d.fn(help=|||
+            Convert a string to upper case.
+          |||),
+          convertToUpper: convertTransform('ToUpper'),
+
+          '#convertToLower':: d.fn(help=|||
+            Convert a string to lower case.
+          |||),
+          convertToLower: convertTransform('ToLower'),
+
+          '#convertToBase64':: d.fn(help=|||
+            Convert a string to base64.
+          |||),
+          convertToBase64: convertTransform('ToBase64'),
+
+          '#convertFromBase64':: d.fn(help=|||
+            Convert a base64 string to a string.
+          |||),
+          convertFromBase64: convertTransform('FromBase64'),
+
+          '#convertToJson':: d.fn(help=|||
+            Convert a string to JSON.
+          |||),
+
+          '#convertToSha1':: d.fn(help=|||
+            Convert a string to a SHA1 hash.
+          |||),
+          convertToSha1: convertTransform('ToSha1'),
+
+          '#convertToSha256':: d.fn(help=|||
+            Convert a string to a SHA256 hash.
+          |||),
+          convertToSha256: convertTransform('ToSha256'),
+
+          '#convertToSha512':: d.fn(help=|||
+            Convert a string to a SHA512 hash.
+          |||),
+          convertToSha512: convertTransform('ToSha512'),
+
+          local trimTransform(type, trim) = {
+            type: 'string',
+            string: {
+              type: type,
+              trim: trim,
+            },
+          },
+
+          '#trimPrefix':: d.fn(help=|||
+            Trim a prefix from a string.
+          |||, args=[
+            d.arg('trim', d.T.string),
+          ]),
+          trimPrefix(trim): trimTransform('TrimPrefix', trim),
+
+          '#trimSuffix':: d.fn(help=|||
+            Trim a suffix from a string.
+          |||, args=[
+            d.arg('trim', d.T.string),
+          ]),
+          trimSuffix(trim): trimTransform('TrimSuffix', trim),
+
+          '#regexp':: d.fn(help=|||
+            Match a regexp against a string. The group is optional and if omitted, the whole match is returned.
+          |||, args=[
+            d.arg('match', d.T.string),
+            d.arg('group', d.T.number),
+          ]),
+          regexp(match, group=''): {
+            type: 'string',
+            string: {
+              type: 'Regexp',
+              regexp: {
+                match: match,
+                [if group != '' then 'group']: group,
+              },
+            },
+          },
+        },
+
+        local mathTransform(type, attribute, value) = {
+          type: 'math',
+          math: {
+            type: type,
+            [attribute]: value,
+          },
+        },
+
+        '#clampMin':: d.fn(help=|||
+          Clamp a number to a minimum value.
+        |||, args=[
+          d.arg('min', d.T.number),
+        ]),
+        clampMin(min): mathTransform('ClampMin', 'clampMin', min),
+
+        '#clampMax':: d.fn(help=|||
+          Clamp a number to a maximum value.
+        |||, args=[
+          d.arg('max', d.T.number),
+        ]),
+        clampMax(max): mathTransform('ClampMax', 'clampMax', max),
       },
     },
 

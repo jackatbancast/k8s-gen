@@ -39,13 +39,26 @@ local d = import 'doc-util/main.libsonnet';
             for envvar in env
           ]),
 
-        '#withEnvMap': d.fn(
-          '`withEnvMap` works like `withEnvMixin` but accepts a key/value map, this map is converted a list of core.v1.envVar(key, value)`',
+        '#withEnvMap': d.fn(|||
+
+            `withEnvMap` works like `withEnvMixin` but accepts a key/value map,
+            this map is converted a list of core.v1.envVar(key, value)`.
+
+            If the value is an object instead of a string, it is placed under
+            the `valueFrom` key.
+
+          |||,
           [d.arg('env', d.T.object)]
         ),
         withEnvMap(env)::
           self.withEnvMixin([
-            $.core.v1.envVar.new(k, env[k])
+            (
+              if std.type(env[k]) == 'object' then
+                $.core.v1.envVar.withName(k) +
+                { valueFrom: env[k] }
+              else
+                $.core.v1.envVar.new(k, env[k])
+            )
             for k in std.objectFields(env)
           ]),
 
@@ -221,6 +234,20 @@ local d = import 'doc-util/main.libsonnet';
         ]),
         fromSecret(name, secretName)::
           super.withName(name) + super.secret.withSecretName(secretName),
+        
+        '#fromCsi': d.fn('Creates a new volume of type `csi`', [
+          d.arg('name', d.T.string),
+          d.arg('driver', d.T.string),
+          d.arg('volumeAttributes', d.T.object, {}),
+        ]),
+        fromCsi(name, driver, volumeAttributes={})::
+          super.withName(name) + { 
+            csi: {
+              driver: driver,
+              readOnly: true,
+              volumeAttributes: volumeAttributes
+            }
+          },
       },
 
       volumeMount+:: {

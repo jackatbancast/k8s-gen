@@ -3,8 +3,13 @@ local config = import 'jsonnet/config.jsonnet';
 local old_versions = [
   { output: '0.4', version: '0.4.4' },
 ];
+
 local versions = [  // since 0.5
-  { output: '0.5', version: '0.5.6' },
+  { output: '0.5', version: '0.5.9' },
+  { output: '0.6', version: '0.6.1' },
+  { output: '0.7', version: '0.7.3' },
+  { output: '0.8', version: '0.8.4' },
+  { output: '0.9', version: '0.9.5' },
 ];
 
 config.new(
@@ -31,7 +36,15 @@ config.new(
         '%s/external-secrets.io_clusterexternalsecrets.yaml' % url,
         '%s/external-secrets.io_clustersecretstores.yaml' % url,
         '%s/external-secrets.io_externalsecrets.yaml' % url,
+        '%s/external-secrets.io_pushsecrets.yaml' % url,
         '%s/external-secrets.io_secretstores.yaml' % url,
+
+        '%s/generators.external-secrets.io_acraccesstokens.yaml' % url,
+        '%s/generators.external-secrets.io_ecrauthorizationtokens.yaml' % url,
+        '%s/generators.external-secrets.io_fakes.yaml' % url,
+        '%s/generators.external-secrets.io_gcraccesstokens.yaml' % url,
+        '%s/generators.external-secrets.io_passwords.yaml' % url,
+        '%s/generators.external-secrets.io_vaultdynamicsecrets.yaml' % url,
       ],
       localName: 'external_secrets',
     }

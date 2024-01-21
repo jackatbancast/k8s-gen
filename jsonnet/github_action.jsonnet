@@ -1,5 +1,5 @@
 local onMaster = { 'if': "${{ github.ref == 'refs/heads/master' && github.repository == 'jsonnet-libs/k8s' }}" };
-local notFork = { 'if': 'github.event.pull_request.head.repo.full_name == github.repository' };
+local notFork = { 'if': "github.event.pull_request.head.repo.full_name == 'jsonnet-libs/k8s'" };
 
 local terraform = {
   job: {
@@ -18,8 +18,8 @@ local terraform = {
     name: 'Create repositories',
     'runs-on': 'ubuntu-latest',
     steps: [
-      { uses: 'actions/checkout@v2' },
-      { uses: 'zendesk/setup-jsonnet@v7' },
+      { uses: 'actions/checkout@v3' },
+      { uses: 'zendesk/setup-jsonnet@v10' },
 
       self.make_env { run: 'make tf/main.tf.json' },
 
@@ -50,19 +50,47 @@ local libJob(name) = {
   name: 'Generate ' + name + ' Jsonnet library and docs',
   needs: ['build', 'repos'],
   'runs-on': 'ubuntu-latest',
+
   steps: [
-    { uses: 'actions/checkout@v2' },
+    { uses: 'actions/checkout@v3' },
+    {
+      uses: 'dorny/paths-filter@v2',
+      id: 'filter',
+      with: {
+        filters: |||
+          workflows:
+            - '.github/**'
+            - 'bin/**'
+            - 'Dockerfile'
+            - 'go.mod'
+            - 'go.sum'
+            - 'jsonnet/**'
+            - 'main.go'
+            - 'Makefile'
+            - 'pkg/**'
+            - 'scripts/**'
+            - 'tf/**'
+            - 'libs/%s/**'
+        ||| % name,
+      },
+    }
+    ,
     {
       uses: 'actions/download-artifact@v2',
+      'if': "steps.filter.outputs.workflows == 'true'",
       with: {
         name: 'docker-artifact',
         path: 'artifacts',
       },
     },
     // Load docker image from cache
-    { run: 'make load' },
+    {
+      run: 'make load',
+      'if': "steps.filter.outputs.workflows == 'true'",
+    },
     {
       run: 'make libs/' + name,
+      'if': "steps.filter.outputs.workflows == 'true'",
       env: {
         GIT_COMMITTER_NAME: 'jsonnet-libs-bot',
         GIT_COMMITTER_EMAIL: '86770550+jsonnet-libs-bot@users.noreply.github.com',
@@ -79,7 +107,7 @@ local build = {
   name: 'Build docker image',
   'runs-on': 'ubuntu-latest',
   steps: [
-    { uses: 'actions/checkout@v2' },
+    { uses: 'actions/checkout@v3' },
     { run: 'make build save' },
     {
       uses: 'actions/upload-artifact@v2',

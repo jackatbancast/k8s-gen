@@ -1,9 +1,9 @@
 local config = import 'jsonnet/config.jsonnet';
 local versions = [
-  ['1.13', '1.13.0'],
-  ['1.12', '1.12.3'],
-  ['1.11', '1.11.6'],
-  ['1.10', '1.10.6'],
+  ['1.20', '1.20.0'],
+  ['1.19', '1.19.1'],
+  ['1.18', '1.18.6'],
+  ['1.17', '1.17.6'],
 ];
 
 config.new(
@@ -14,6 +14,7 @@ config.new(
       prefix: '^io\\.istio\\..*',
       crds: ['https://raw.githubusercontent.com/istio/istio/' + version[1] + '/manifests/charts/base/crds/crd-all.gen.yaml'],
       localName: 'istio',
+      patchDir: 'custom',
     }
     for version in versions
   ]
